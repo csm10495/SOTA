@@ -8,7 +8,7 @@ This section describes various terminology used throughout the document.
 A acknowledgement byte sent by the [Slave](#slave) to the [Master](#master) to notify that the sending of the command thus far has not resulted in an error. This code is designated by the [Command Acknowledgements Table](#command-acknowledgements-table). Some acknowledgement bytes may directly correspond with a required action taken by the [Master](#master).
 
 #### Buffer
-Often used to designate the hard-coded transfer size of 128 bytes until a [Command Acknowledgement](#command-acknowledgement) shall be sent by the [Slave](#slave) to the [Master](#master). The final two bytes of the Buffer is always a checksum of the entirety of preceeding 126 bytes. The only transfer that does not need to be a 128 byte buffer is the [Command Acknowledgement](#command-acknowledgement).
+Often used to designate the hard-coded transfer size of 128 bytes until a [Command Acknowledgement](#command-acknowledgement) shall be sent by the [Slave](#slave) to the [Master](#master). The final two bytes of the Buffer is always a checksum of the entirety of preceeding 126 bytes. The only transfers that do not need to consist of 128 byte buffers are that of the [Command Acknowledgement](#command-acknowledgement).
 
 #### Command
 Set of bytes sent to a [Slave](#slave) with the expectation of a particular response taken by that [Slave](#slave).
@@ -52,12 +52,15 @@ All commands designated in this section shall be supported by any device support
 ### Command Table
 | Operation Code | Command Name | Data Direction  |
 |----------------|--------------|-----------------|
-| 0x0001         | [Identify](#identify)        | Read |
+| 0x0001         | [Identify](#identify) | Read |
+| 0x2000         | [Abort](#abort)       | Non-Data |
 
 * All SOTA read (slave -> master) commands must have an Operation Code less than 0x1000
-* All SOTA write (master -> slave) commands must have an Operation Code less than 0x2000 and greater than 0x1000
-* All Vendor-Unique read (slave -> master) commands must have an Operation Code less than 0x3000 and greater than 0x2000
-* All Vendor-Unique write (master -> slave) commands must have an Operation Code less than 0x4000 and greater than 0x3000
+* All SOTA write (master -> slave) commands must have an Operation Code less than 0x2000 and greater than or equal to 0x1000
+* All SOTA non-data commands must have an Operation Code less than 0x3000 and greater than or equal to 0x2000
+* All Vendor-Unique read (slave -> master) commands must have an Operation Code less than 0x4000 and greater than or equal to 0x3000
+* All Vendor-Unique write (master -> slave) commands must have an Operation Code less than 0x5000 and greater than or equal to 0x4000
+* All Vendor-Unique non-data commands must have an Operation Code less than 0x6000 and greater than or equal to 0x5000
 * All other Operation Code regions are reserved.
 
 #### Standard Payload Header
@@ -69,7 +72,7 @@ For commands with a data transfer from master to slave, DTL must be set by the m
 |-------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 00:03 | SP           | Sync Packet. This value must be 0xBB77AAFE. The intention of this packet is to ensure that the master and slave are synchronized.  If a command does not start with the designated Sync Packet, the slave shall reject the command via a Nack with Invalid Sync Packet.                                                                                                                                                                                                                                                      |
 | 04:07 | OPC          | Operation Code. This value shall designate the specific command that is being invoked. Every command shall have a unique Operation Code.                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 08:15 | DTL          | Data Transfer Length. The number of bytes to be written from sender to receiver after the completion of the standard payload header. This number does not need to be divisible by the buffer size (128 bytes). If not divisible, the sender shall fill the remaining data in the current 128 byte buffer with 0xCC and the 2 byte checksum. This value shall not include bytes in the Standard Payload Header. |
+| 08:15 | DTL          | Data Transfer Length. The number of bytes to be written from sender to receiver after the completion of the standard payload header. This number does not need to be divisible by the buffer size (128 bytes). If not divisible, the sender shall fill the remaining data in the current 128 byte buffer with 0xCC and the 2 byte checksum. This value shall not include bytes in the Standard Payload Header. On Non-data commands this must be set to 0, though the buffer must be completely filled out.|
 
 #### Command Sequence
 Often sending a single command will be useful since the master would not be able to qualify success or failure of the given command. This section gives an for how commands can be sequenced together.
@@ -93,6 +96,8 @@ The Identify command is used to query the device for various properties includin
 | 48:67 | SS           | Serial String for the given slave. This value is often intended to be unique for a given Product Revision.                                          |
 | 68:87 | ST           | Status String for the given slave. The slave shall place "Healthy" in this location if the device is considered to be in a fully operational state. |
 
+### Abort
+The Abort command is used to request that the slave abort the current command. The current command must be in progress and the slave must be currently in its busy-loop. After sending this command, it is possible that the device may begin the abort process but still return a Busy status. This command is a best-effort and it should not be considered a guarantee that the currently executing command will be definitively aborted. The success of the eventual abort can be determined via receipt of the Failure Due To Abort acknowledgement. The master may send this command multiple times to request the abort. If the slave receives it multiple times and aborts the current command, it shall continue to return Failure Due To Abort until a command other than Abort is sent.
 
 ## Command Acknowledgements
 During the transmission process, it is possible that an error could be detected by the slave that should percolate back to the master. Therefore, with every individual buffer transfer of 128 bytes, sent by the master, the slave must reply with one of the below command acknowledgement bytes followed by the last non-checksum byte of data from the buffer.
@@ -106,23 +111,21 @@ During the transmission process, it is possible that an error could be detected 
 ### Command Acknowledgements Table
 | Ack Byte    | Meaning             | Extended Meaning                                                      |
 |------------:|--------------------:|----------------------------------------------------------------------:|
-|        0x01 |                Good | The command has completed successfully.                               |
-|        0x02 |                Busy | Processing the command and can still reply. Will send a Busy Ack Byte every second, while the current command is processed, followed by a single Good or Failure byte after completion. The master shall read until something besides Busy is returned, or a general timeout occurs. During the slave busy-loop, if a complete buffer of all 0xAA data (with valid checksum) is received the slave shall make a best-effort to abort the current command and sequence. Even if the command is aborted, Good or Failure shall be returned.|
+|        0x01 | Good                | The command has completed successfully, or the buffer was received and validated successfully. |
+|        0x02 | Busy                | Processing the command and can still reply. Will send a Busy Ack Byte every second, while the current command is processed, followed by a single Good or Failure byte after completion. The master shall read until something besides Busy is returned, or a general timeout occurs. An [Abort](#abort) may be issued during the described busy loop. |
 |        0x03 |      Pause Sequence | After this action, the device may not be able to respond. Master shall read 2 bytes right after getting Pause Sequence. This 2 byte value corresponds with the amount of time (in seconds) to wait to continue the current sequence. Master shall pause and expect a Good or Failure acknowledgement byte from the slave waiting after sleeping for the given wait time. The last byte after the wait time, is the next acknowledgement byte. Pause Sequences may not be chained together.
-|        0xFA | Failure Due To Abort | The command was aborted during it's busy-loop and has therefore failed. |
-|        0xFB | Command Error       | The last command of the sequence was not processed due to a small-scale suspected transmission error. Consider retrying the last command. |
-|        0xFC | Sequence Error      | The last command of the sequence was not processed due to a large-scale suspected transmission error. Consider retrying the sequence. |
-|        0xFD | Invalid Operation Code | The sent operation code is not supported on this device. Do not retry. |
-|        0xFE | Invalid Sync Packet | The sync packet did not match 0xBB77AAFE. The command was not processed. Retry the command. |
-|        0xFF |             Failure | The command was processed and has failed. Do not retry. |
+|        0xF9 | Failure Due To Abort | The command was aborted during it's busy-loop and has therefore failed. |
+|        0xFA | Buffer Error        | The last buffer of the sequence was not processed due to a small-scale suspected transmission error. Consider retrying the buffer. |
+|        0xFB | Sequence Error      | The last command of the sequence was not processed due to a large-scale suspected transmission error. Consider retrying the sequence. |
+|        0xFC | Invalid Operation Code | The sent operation code is not supported on this device. Do not retry. |
+|        0xFD | Invalid Sync Packet | The sync packet did not match 0xBB77AAFE. The command was not processed. Retry the buffer. |
+|        0xFE | Invalid Checksum    | The buffer checksum did not match the data transferred. The command was not processed. Retry the buffer. |
+|        0xFF | Failure             | The command was processed and has failed. Do not retry. |
 
 Any ack byte yielded by the slave to the master that is not defined in the above chart can lead to undefined behavior.
 
 #### Pause Sequence
 Pause Sequence is a special acknowledgement byte in that it requires that the master read an additional 2 bytes of non-checksum-validated data from the slave. This is a special consideration to allow the slave to specify that it will be unable to pass back additional ack bytes for a specific amount of time (at most) though will be busy and unable to pass more return bytes. A Pause Sequence may not specify another Pause Sequence as the following acknowledgement, however it pass a Busy and then Pause Sequence again, though this is not normally recommended. Both Pause Sequence and Busy are intended to denote situations where the slave is processing an outstanding command.
-
-#### Command Aborts
-When the slave is in a busy-loop, the master may attempt a Command Abort, by sending a complete buffer of all 0xAA data with a valid 2 byte checksum. If the slave processes this buffer, it should make a best-effort to abort the current command sequence and return back a Failure Due To Abort acknowledgement.
 
 ## Communication Synchronization
 When the master begins to communicate with the slave, it is possible that for various reasons, the two may not be in sync in terms of number of bytes to send to get a Command Acknowledgement. The expected method to resolve this is described here.
