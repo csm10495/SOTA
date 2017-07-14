@@ -1,58 +1,58 @@
 # Serial Open Transport Apparatus
-The *Serial Open Transport Apparatus* also known as *SOTA* is a transport-level specification designed to allow the transmission of specification-agnostic commands over a serial bus. This is an early version of this specification and is therefore subject to change. Commands not outlined explicitly in this specification are outside of this document's scope, though are still required to use the [Standard Payload Header](####Standard-Payload-Header) and normal-sized buffers.
+The *Serial Open Transport Apparatus* also known as *SOTA* is a transport-level specification designed to allow the transmission of specification-agnostic commands over a serial bus. This is an early version of this specification and is therefore subject to change. Commands not outlined explicitly in this specification are outside of this document's scope, though are still required to use the [Standard Payload Header](#standard-payload-header) and normal-sized buffers.
 
 ## Definitions
 This section describes various terminology used throughout the document.
 
 #### Ack
-A acknowledgement byte sent by the [Slave](####Slave) to the [Master](####Master) to notify that the sending of the command thus far has not resulted in an error. This code is designated by the [Command Acknowledgements Table](###Command-Acknowledgements-Table). Some acknowledgement bytes may directly correspond with a required action taken by the [Master](####Master).
+A acknowledgement byte sent by the [Slave](#slave) to the [Master](#master) to notify that the sending of the command thus far has not resulted in an error. This code is designated by the [Command Acknowledgements Table](#command-acknowledgements-table). Some acknowledgement bytes may directly correspond with a required action taken by the [Master](#master).
 
 #### Buffer
-Often used to designate the hard-coded transfer size of 128 bytes until a [Command Acknowledgement](###Command-Acknowledgement) shall be sent by the [Slave](####Slave) to the [Master](####Master). The final two bytes of the Buffer is always a checksum of the entirety of preceeding 126 bytes. The only transfer that does not need to be a 128 byte buffer is the [Command Acknowledgement](###Command-Acknowledgement).
+Often used to designate the hard-coded transfer size of 128 bytes until a [Command Acknowledgement](#command-acknowledgement) shall be sent by the [Slave](#slave) to the [Master](#master). The final two bytes of the Buffer is always a checksum of the entirety of preceeding 126 bytes. The only transfer that does not need to be a 128 byte buffer is the [Command Acknowledgement](#command-acknowledgement).
 
 #### Command
-Set of bytes sent to a [Slave](####Slave) with the expectation of a particular response taken by that [Slave](####Slave).
+Set of bytes sent to a [Slave](#slave) with the expectation of a particular response taken by that [Slave](#slave).
 
 #### Command Acknowledgement
-Either an [Ack](####Ack) or [Nack](####Nack) sent from the [Slave](####Slave) to the [Master](####Master) upon the completion of the transmission of a [Buffer](####Buffer) from the [Master](####Master) to the [Slave](####Master). This initial transfer is 2 bytes in size. The first byte is the [Ack](####Ack) or [Nack](####Nack), the second byte is the last byte received in the 128 byte buffer. Note that a Command Acknowledgement may specify another read to perform a specific action.
+Either an [Ack](#ack) or [Nack](#nack) sent from the [Slave](#slave) to the [Master](#master) upon the completion of the transmission of a [Buffer](#buffer) from the [Master](#master) to the [Slave](#master). This initial transfer is 2 bytes in size. The first byte is the [Ack](#ack) or [Nack](#nack), the second byte is the last byte received in the 128 byte buffer. Note that a Command Acknowledgement may specify another read to perform a specific action.
 
 #### Data Direction
-A command is considered to either be primarily a transfer of data from either the [Master](####Master) to the [Slave](####Slave) (sometimes called a read) or the [Slave](####Slave) to the [Master](####Master). In both cases, the command must specify the amount payload data to transfer in the DTL field of the [Standard Payload Header](#Standard-Payload-Header).
+A command is considered to either be primarily a transfer of data from either the [Master](#master) to the [Slave](#slave) (sometimes called a read) or the [Slave](#slave) to the [Master](#master). In both cases, the command must specify the amount payload data to transfer in the DTL field of the [Standard Payload Header](#standard-payload-header).
 
 #### Endianness
-Unless otherwise noted, all numeric byte-diagrams and fields are considered to be little-endian. All [String](####String)s are big-endian.
+Unless otherwise noted, all numeric byte-diagrams and fields are considered to be little-endian. All [String](#string)s are big-endian.
 
 #### Filler Bytes
-Used to fill a given buffer to 126 bytes, so that adding on a 2 byte checksum, completes the 128 byte [Buffer](####Buffer)
+Used to fill a given buffer to 126 bytes, so that adding on a 2 byte checksum, completes the 128 byte [Buffer](#buffer)
 
 #### Master
-The device that is sending commands to the [Slave](####Slave).
+The device that is sending commands to the [Slave](#slave).
 
 #### Nack
-A byte sent by the [Slave](####Slave) to the [Master](####Master) to notify that the sending of the command has run into an issue. These codes are designated by the [Command Acknowledgements Table](###Command-Acknowledgements-Table).
+A byte sent by the [Slave](#slave) to the [Master](#master) to notify that the sending of the command has run into an issue. These codes are designated by the [Command Acknowledgements Table](#command-acknowledgements-table).
 
 #### Payload
-A set of [Buffers](####Buffer) used to send a command or reap a command response.
+A set of [Buffers](#buffer) used to send a command or reap a command response.
 
 #### Sequence
-A set of multiple [Command](####Command)s sent for a particular flow. For example: sending a command, processing the [Command Acknowledgement](####Command-Acknowledgement) and then reading back the resulting data.
+A set of multiple [Command](#command)s sent for a particular flow. For example: sending a command, processing the [Command Acknowledgement](#command-acknowledgement) and then reading back the resulting data.
 
 #### Slave
-The device that is receiving commands from the [Master](####Master).
+The device that is receiving commands from the [Master](#master).
 
 #### String
 Sequence of bytes denoting ASCII text. All strings in all commands are in a big-endian format. Strings shall not be byte-swapped.
 
 #### Sync Packet
-4 byte value set to 0xBB77AAFE in little-endian. This must be the first 4 bytes of all [Standard Payload Headers](####Standard-Payload-Header).
+4 byte value set to 0xBB77AAFE in little-endian. This must be the first 4 bytes of all [Standard Payload Headers](#standard-payload-header).
 
 ## Commands
-All commands designated in this section shall be supported by any device supporting this SOTA Specification. The minimum payload for a command is the entirety of the 128 byte buffer. The last two bytes of any buffer must be a checksum of the preceeding 126 bytes. A command may span multiple buffers, though the total size after the [Standard Payload Header](####Standard-Payload-Header), including checksums must be specified in the Data Transfer Length field.
+All commands designated in this section shall be supported by any device supporting this SOTA Specification. The minimum payload for a command is the entirety of the 128 byte buffer. The last two bytes of any buffer must be a checksum of the preceeding 126 bytes. A command may span multiple buffers, though the total size after the [Standard Payload Header](#standard-payload-header), including checksums must be specified in the Data Transfer Length field.
 
 ### Command Table
 | Operation Code | Command Name | Data Direction  |
 |----------------|--------------|-----------------|
-| 0x0001         | [Identify](###Identify)        | Read |
+| 0x0001         | [Identify](#identify)        | Read |
 
 * All SOTA read (slave -> master) commands must have an Operation Code less than 0x1000
 * All SOTA write (master -> slave) commands must have an Operation Code less than 0x2000 and greater than 0x1000
@@ -61,23 +61,25 @@ All commands designated in this section shall be supported by any device support
 * All other Operation Code regions are reserved.
 
 #### Standard Payload Header
-All payloads must initially begin with a [Standard Payload Header](####Standard-Payload-Header), also referred to as an SPH. DTL must only be set by the operand sending data. For example: If a master is reading data from the slave, it shall set DTL to 0. Though when the slave is sending the data, it's SPH must have DTL set to the data length it is sending (minus the SPH size itself).
+All payloads must initially begin with a [Standard Payload Header](#standard-payload-header), also referred to as an SPH. DTL must only be set by the operand sending data. For example: If a master is reading data from the slave, it shall set DTL to 0. Though when the slave is sending the data, it's SPH must have DTL set to the data length it is sending (minus the SPH size itself). There is only an SPH in both directions on a read command as a write does not have the slave return data past the acknowledgement packet.
+
+For commands with a data transfer from master to slave, DTL must be set by the master if there is a data transfer needed. For commands with a data transfer from slave to master, the master shall set DTL to 0 and based of the transfer direction of the command, the master should know to read the SPH after the acknowledgement packet.
 
 | Bytes | Abbreviation | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 |-------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 00-03 | SP           | Sync Packet. This value must be 0xBB77AAFE. The intention of this packet is to ensure that the master and slave are synchronized.  If a command does not start with the designated Sync Packet, the slave shall reject the command via a Nack with Invalid Sync Packet.                                                                                                                                                                                                                                                      |
-| 04-07 | OPC          | Operation Code. This value shall designate the specific command that is being invoked. Every command shall have a unique Operation Code.                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 08-15 | DTL          | Data Transfer Length. The number of bytes to be written from sender to receiver after the completion of the standard payload header. This number does not need to be divisible by the buffer size (128 bytes). If not divisible, the sender shall fill the remaining data in the current 128 byte buffer with 0xCC and the 2 byte checksum. This value shall not include bytes in the Standard Payload Header. |
+| 00:03 | SP           | Sync Packet. This value must be 0xBB77AAFE. The intention of this packet is to ensure that the master and slave are synchronized.  If a command does not start with the designated Sync Packet, the slave shall reject the command via a Nack with Invalid Sync Packet.                                                                                                                                                                                                                                                      |
+| 04:07 | OPC          | Operation Code. This value shall designate the specific command that is being invoked. Every command shall have a unique Operation Code.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 08:15 | DTL          | Data Transfer Length. The number of bytes to be written from sender to receiver after the completion of the standard payload header. This number does not need to be divisible by the buffer size (128 bytes). If not divisible, the sender shall fill the remaining data in the current 128 byte buffer with 0xCC and the 2 byte checksum. This value shall not include bytes in the Standard Payload Header. |
 
 #### Command Sequence
-Often sending a single command will be useful since the master would not be able to qualify success or failure of the given command. This section gives a couple examples for how commands can be sequenced together.
+Often sending a single command will be useful since the master would not be able to qualify success or failure of the given command. This section gives an for how commands can be sequenced together.
 
 ##### Identify Sequence (Example)
 For the following sequence assume that there were no transmission errors.
-1. Master writes the Identify SPH, with filler bytes and checksum to the slave.
-3. Slave verifies the given [Standard Payload Header](####Standard-Payload-Header) and the ending checksum.
-4. Slave sends back an acknowledgement and follows it with all data required by the [Standard Payload Header](####Standard-Payload-Header) followed by the [Identify Return Payload Definition](####-Identify-Return-Payload-Definition). DTL is set to the size of the Identify Return Payload.
-5. Master reads the acknowledgement byte sent by the slave. Since the acknowledgement byte was "Good", reads 16 bytes to get the [Standard Payload Header](####Standard-Payload-Header), then read DTL worth of data to complete the command transfer. The master reads until the final-needed buffer is completed in order to validate the return checksum.
+1. Master writes the Identify SPH, with DTL set to 0, with filler bytes and checksum to the slave.
+3. Slave verifies the given [Standard Payload Header](#standard-payload-header) and the ending checksum.
+4. Slave sends back an acknowledgement and follows it with all data required by the [Standard Payload Header](#standard-payload-header) followed by the [Identify Return Payload Definition](#identify-return-payload-definition). DTL is set to the size of the Identify Return Payload.
+5. Master reads the acknowledgement byte sent by the slave. Since the acknowledgement byte was "Good", reads 16 bytes to get the [Standard Payload Header](#standard-payload-header), then read DTL worth of data to complete the command transfer. The master reads until the final-needed buffer is completed in order to validate the return checksum.
 
 ### Identify
 The Identify command is used to query the device for various properties including it's serial number and general status.
@@ -98,8 +100,8 @@ During the transmission process, it is possible that an error could be detected 
 ## Command Acknowledgement Payload
 | Byte | Abbreviation | Description                                                                  |
 |------|--------------|------------------------------------------------------------------------------|
-| 00   | ACK          | Ack or Nack byte for the previous command or buffer. See [Command Acknowledgements Table](###-Command-Acknowledgements-Table).                          |
-| 01   | LBB          | Last byte of the buffer data that has led to this ack. This byte is intended to be used for [Communication Synchronization](##-Communication-Synchronization). |
+| 00   | ACK          | Ack or Nack byte for the previous command or buffer. See [Command Acknowledgements Table](#command-acknowledgements-table).                          |
+| 01   | LBB          | Last byte of the buffer data that has led to this ack. This byte is intended to be used for [Communication Synchronization](#communication-synchronization). |
 
 ### Command Acknowledgements Table
 | Ack Byte    | Meaning             | Extended Meaning                                                      |
